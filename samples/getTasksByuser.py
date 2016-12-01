@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 """
+
+Written by Jayanth Ramachandran
+Github: https://github.com/jramacha
+Email: sqljay.ram@gmail.com
+Note: Example code For testing purposes only
+
+This code has been released under the terms of the Apache-2.0 license
+http://opensource.org/licenses/Apache-2.0
+
 A simple program for listing recent vCenter tasks for a particular user within the last 24 hours.
+
 """
 
 from optparse import OptionParser,make_option
@@ -8,10 +18,6 @@ from optparse import OptionParser,make_option
 import atexit
 import sys
 import datetime
-
-sys.path.append("/home/jramacha/pyvmomi")
-
-
 from pyVim import connect
 from pyVmomi import vmodl
 from pyVmomi import vim
@@ -21,10 +27,8 @@ import ssl
 
 import textwrap
 import time
-import math
 import sys
 import os
-import util
 import pytz
 from datetime import datetime, timedelta
 """
@@ -73,14 +77,11 @@ def main():
       taskManager = content.taskManager
       specByuser = vim.TaskFilterSpec.ByUsername(userList= args.user)
      
-      # Please check for documentation https://github.com/vmware/pyvmomi/blob/master/docs/vim/TaskFilterSpec.rst 
-      # https://github.com/vmware/pyvmomi/blob/master/docs/vim/HistoryCollector.rst
       tasks = taskManager.CreateCollectorForTasks(vim.TaskFilterSpec(userName=specByuser))
-      #tasks = taskManager.CreateCollectorForTasks(vim.TaskFilterSpec())
+      
       tasks.ResetCollector()
       alltasks = tasks.ReadNextTasks(999)
-      #print alltasks
-      #print util.getsize(alltasks)
+      
       yesterday = datetime.now() - timedelta(1) # Get yesterday's time
       eastern = pytz.timezone('US/Eastern')
       for task in alltasks:
