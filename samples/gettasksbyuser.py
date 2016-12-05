@@ -13,8 +13,6 @@ A simple program for listing recent vCenter tasks for a particular user within t
 
 """
 
-from optparse import OptionParser,make_option
-
 import atexit
 import sys
 import datetime
@@ -25,81 +23,77 @@ import argparse
 import pyVmomi
 import ssl
 
-import textwrap
-import time
-import sys
-import os
 import pytz
 from datetime import datetime, timedelta
-"""
-sample call
-./taskListByUser.py --host 'host'  --user 'user' --password 'pwd' --port 443
-"""
-def GetArgs():
-   """
-   Supports the command-line arguments listed below.
-   """
-   parser = argparse.ArgumentParser(description='Process args for retrieving tasks')
-   parser.add_argument('-s', '--host', required=True, action='store', help='Remote host to connect to')
-   parser.add_argument('-o', '--port', default=443,   action='store', help='Port to connect on')
-   parser.add_argument('-u', '--user', required=True, action='store', help='User name to use when connecting to host')
-   parser.add_argument('-p', '--password', required=True, action='store', help='Password to use when connecting to host')
-   args = parser.parse_args()
-   return args
+
+def get_args():
+    """
+    Supports the command-line arguments listed below.
+    """
+    parser = argparse.ArgumentParser(description=\
+						'Process args for retrieving all the Virtual Machines')
+    parser.add_argument('-s', '--host', required=True, action='store', \
+						help='Remote host to connect to')
+    parser.add_argument('-o', '--port', default=443, action='store', \
+						help='Port to connect on')
+    parser.add_argument('-u', '--user', required=True, action='store', \
+						help='User name to use when connecting to host')
+    parser.add_argument('-p', '--password', required=True, \
+						action='store', help='Password to use when connecting to host')
+    args = parser.parse_args()
+    return args
 
 
 def main():
-   """
-   Simple command-line program for listing tasks with a timeframe for a user.
-   """
+    """
+    Simple command-line program for listing tasks .
+    """
 
-   args = GetArgs()
-   try:
-      si = None
+    args = get_args()
+    try:
+        service_instance = None
+        ssl._create_default_https_context = ssl._create_unverified_context
+        try:
+            service_instance = connect.SmartConnect(
+            host=args.host,
+            user=args.user,
+            pwd=args.password,
+            port=int(args.port)
+           )
+        except IOError as e_x:
+            pass
+        if not service_instance:
+            print "Could not connect to the specified host" \
+					"uservice_instanceng given credentials \
+					%s %s  %s %s " %(args.host, args.user, args.password, args.port)
+            return -1
 
-      ssl._create_default_https_context = ssl._create_unverified_context
-      try:
-         si = connect.SmartConnect(
-            host  = args.host,
-            user  = args.user,
-            pwd   = args.password,
-            port  = int(args.port)
-         )
-      except IOError, e:
-        pass
-      if not si:
-         print "Could not connect to the specified host using given credentials %s %s  %s %s " %(args.host,args.user,args.password,args.port)
-         return -1
+        atexit.register(connect.Disconnect, service_instance)
+        content = service_instance.RetrieveContent()
+        task_manager = content.taskManager
+        spec_byuser = vim.TaskFilterSpec.ByUsername(userList=args.user)
+        tasks = task_manager.CreateCollectorForTasks\
+				(vim.TaskFilterSpec(userName=spec_byuser))
+        tasks.ResetCollector()
+        alltasks = tasks.ReadNextTasks(999)
+        yesterday = datetime.now() - timedelta(1) # Get yesterday's time
+        eastern = pytz.timezone('US/Eastern')
+        for task in alltasks:
+            if task.startTime > eastern.localize(yesterday):
+                print str(task.startTime) + ' ' + task.entityName + \
+								 ' ' + task.state + ' ' + task.descriptionId
+        print 'Destroying collector'
+        tasks.DestroyCollector()
 
-      atexit.register(connect.Disconnect, si)
-      
-      content = si.RetrieveContent()
-      taskManager = content.taskManager
-      specByuser = vim.TaskFilterSpec.ByUsername(userList= args.user)
-     
-      tasks = taskManager.CreateCollectorForTasks(vim.TaskFilterSpec(userName=specByuser))
-      
-      tasks.ResetCollector()
-      alltasks = tasks.ReadNextTasks(999)
-      
-      yesterday = datetime.now() - timedelta(1) # Get yesterday's time
-      eastern = pytz.timezone('US/Eastern')
-      for task in alltasks:
-          if task.startTime >  eastern.localize(yesterday):
-              print str(task.startTime) + ' ' + task.entityName + ' ' + task.state 
-      print 'Destroying collector'
-      tasks.DestroyCollector()
+    except vmodl.MethodFault as e_x:
+        print "Caught vmodl fault : " + e_x.msg
+        return -1
+    except Exception as e_x:
+        print "Caught exception : " + str(e_x)
+        return -1
 
-   except vmodl.MethodFault, e:
-      print "Caught vmodl fault : " + e.msg
-      return -1
-   except Exception, e:
-      print "Caught exception : " + str(e)
-      return -1
-
-   return 0
+    return 0
 
 # Start program
 if __name__ == "__main__":
-   main()
-
+    main()
